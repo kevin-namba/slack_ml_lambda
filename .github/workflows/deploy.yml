@@ -27,8 +27,5 @@ jobs:
         run: |
           pip3 install awscli
           cd lambda && zip -r package.zip ./*
-          aws lambda update-function-code --function-name （Lambda関数名） --zip-file fileb://package.zip --publish
+          aws lambda update-function-code --function-name test_function --zip-file fileb://package.zip --publish
           
-      - name: EventBridge Settings cron
-        run: |
-          aws events put-rule --name （EventBridgeルール名） --schedule-expression 'cron(00 0/1 * * ? *)'
