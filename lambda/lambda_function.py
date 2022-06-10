@@ -28,7 +28,7 @@ def lambda_handler(event, context):
     
     payload  = {
         "channel" : "C03EW561RJB"
-        }
+    }
     
     res = requests.get(url, headers=header, params=payload)
     
