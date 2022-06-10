@@ -4,7 +4,6 @@ import boto3
 comprehend = boto3.client('comprehend')
 
 def lambda_handler(event, context):
-    #CI導!
     input_text = "とても美味しいです！"
     #comprehend接続のテスト 
     # response = comprehend.detect_sentiment(
