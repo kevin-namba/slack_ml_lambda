@@ -1,6 +1,6 @@
 import json
 import boto3
-
+# CI走ったよ
 comprehend = boto3.client('comprehend')
 
 def lambda_handler(event, context):
