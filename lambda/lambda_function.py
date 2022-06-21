@@ -7,22 +7,22 @@ import requests
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-# slack API client
-USER_TOKEN = 'xoxp-3520750066675-3514126860774-3577573220384-e8db3feed159abbd81e967571ffa9e28'
-BOT_TOKEN = 'xoxb-3520750066675-3556193162788-Nr7idPBHOrMmqR12ljcT8bME'
-# WebClient instantiates a client that can call API methods
-# When using Bolt, you can use either `app.client` or the `client` passed to listeners.
-client = WebClient(token=BOT_TOKEN)
-logger = logging.getLogger(__name__)
-
-# comprehend client
-# comprehend = boto3.client('comprehend')
 
 def lambda_handler(event, context):
 
-    channel_name = "授業"
+    ### get request
+    # USER_TOKEN = 'xoxp-3520750066675-3514126860774-3577573220384-e8db3feed159abbd81e967571ffa9e28'
+    # BOT_TOKEN = 'xoxb-3520750066675-3556193162788-Nr7idPBHOrMmqR12ljcT8bME'
+    # CHANNEL_NAME = "授業"
+    BOT_TOKEN = event["bot_token"]
+    CHANNEL_NAME = event["channel_name"]
 
     ### get slack log
+    # WebClient instantiates a client that can call API methods
+    # When using Bolt, you can use either `app.client` or the `client` passed to listeners.
+    client = WebClient(token=BOT_TOKEN)
+    logger = logging.getLogger(__name__)
+
     # get channel id
     channel_id = None
     try:
@@ -31,7 +31,7 @@ def lambda_handler(event, context):
             if channel_id is not None:
                 break
             for channel in result["channels"]:
-                if channel["name"] == channel_name:
+                if channel["name"] == CHANNEL_NAME:
                     channel_id = channel["id"]
                     #Print result
                     print(f"Found conversation ID: {channel_id}")
@@ -41,7 +41,7 @@ def lambda_handler(event, context):
         # TODO: error handling
     
     if channel_id is None:
-        print(f"Error: No such channel: {channel_name}")
+        print(f"Error: No such channel: {CHANNEL_NAME}")
         # TODO: error handling
         return
     
@@ -59,6 +59,9 @@ def lambda_handler(event, context):
     
     return conversation_history
 
+    # comprehend client
+    # comprehend = boto3.client('comprehend')
+
     ### comprehend接続のテスト 
     # input_text = "とても美味しいです！"
     # response = comprehend.detect_sentiment(
@@ -73,6 +76,6 @@ def lambda_handler(event, context):
     #     })
     # }
 
-if __name__ == "__main__":
-    res = lambda_handler(None, None)
-    print(res)
+# if __name__ == "__main__":
+#     res = lambda_handler(None, None)
+#     print(res)
