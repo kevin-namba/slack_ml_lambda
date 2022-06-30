@@ -6,8 +6,8 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 
-BUCKET_NAME = "akihito-test-comprehend"
-COMPREHEND_ACCESS_ARN = "arn:aws:iam::900613276729:role/service-role/akihitoTestComprehendFromS3-role-k6fjnrnz"
+BUCKET_NAME = ""
+COMPREHEND_ACCESS_ARN = ""
 
 
 def get_slack_history(bot_token, channel_name):
