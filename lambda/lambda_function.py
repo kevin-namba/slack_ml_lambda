@@ -1,29 +1,28 @@
-# import boto3
+import boto3
 import json
-import logging
+import os
 
-import requests
-# Import WebClient from Python SDK (github.com/slackapi/python-slack-sdk)
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 
-def lambda_handler(event, context):
+BUCKET_NAME = "akihito-test-comprehend"
+COMPREHEND_ACCESS_ARN = "arn:aws:iam::900613276729:role/service-role/akihitoTestComprehendFromS3-role-k6fjnrnz"
 
-    ### get request
-    # USER_TOKEN = 'xoxp-3520750066675-3514126860774-3577573220384-e8db3feed159abbd81e967571ffa9e28'
-    # BOT_TOKEN = 'xoxb-3520750066675-3556193162788-Nr7idPBHOrMmqR12ljcT8bME'
-    # CHANNEL_NAME = "授業"
-    BOT_TOKEN = event["bot_token"]
-    CHANNEL_NAME = event["channel_name"]
 
-    ### get slack log
+def get_slack_history(bot_token, channel_name):
+    """
+    Get slack conversation history.
+    Upload data to s3 in two type.
+     - input text for comprehend
+     - data which contains metadata per user
+    """
+
     # WebClient instantiates a client that can call API methods
     # When using Bolt, you can use either `app.client` or the `client` passed to listeners.
-    client = WebClient(token=BOT_TOKEN)
-    logger = logging.getLogger(__name__)
+    client = WebClient(token=bot_token)
 
-    # get channel id
+    ### Get channel id
     channel_id = None
     try:
         # Call the conversations.list method using the WebClient
@@ -31,51 +30,92 @@ def lambda_handler(event, context):
             if channel_id is not None:
                 break
             for channel in result["channels"]:
-                if channel["name"] == CHANNEL_NAME:
+                if channel["name"] == channel_name:
                     channel_id = channel["id"]
-                    #Print result
                     print(f"Found conversation ID: {channel_id}")
                     break
     except SlackApiError as e:
         print(f"Error: {e}")
         # TODO: error handling
-    
+
     if channel_id is None:
-        print(f"Error: No such channel: {CHANNEL_NAME}")
+        print(f"Error: No such channel: {channel_name}")
         # TODO: error handling
         return
     
-    # Store conversation history
+    ### Get conversation history
     conversation_history = []
     try:
         # Call the conversations.history method using the WebClient
         # conversations.history returns the first 100 messages by default
         # These results are paginated, see: https://api.slack.com/methods/conversations.history$pagination
-        conversation_history = client.conversations_history(channel=channel_id)["messages"]
-        # logger.info("{} messages found in {}".format(len(conversation_history), id))
-
+        conversation_history = client.conversations_history(channel=channel_id, limit=1000)["messages"]
     except SlackApiError as e:
-        logger.error("Error creating conversation: {}".format(e))
+        print("Error creating conversation: {}".format(e))
     
-    return conversation_history
+    ### split conversation history per user
+    users_list = client.users_list()["members"]
+    data = {}
+    for user in users_list:
+        data[user["id"]] = []
+    for line in conversation_history:
+        u =  line["user"]
+        t = line["text"].replace("\n", " ")
+        data[u].append(t)
+    for user in users_list:
+        file_name = "/tmp/" + user["id"] + "/input.txt"
+        if not os.path.exists("/tmp/" + user["id"]):
+            os.mkdir("/tmp/" + user["id"])
+        with open(file_name, mode='w') as f:
+            for item in data[user["id"]]:
+                f.write(item)
+                f.write("\n")
+            f.close()
+    print(os.listdir("/tmp"))
+            
+    ### Upload input text
+    s3 = boto3.resource('s3')
+    s3_filename_list = []
+    for user in users_list:
+        local_filename = "/tmp/" + user["id"] + "/input.txt"
+        s3_filename = bot_token + "/" + channel_id + "/" + user["id"] + "/input.txt"
+        s3.meta.client.upload_file(local_filename, BUCKET_NAME, s3_filename)
+        s3_filename_list.append(s3_filename)
+    
+    return s3_filename_list
 
-    # comprehend client
-    # comprehend = boto3.client('comprehend')
 
-    ### comprehend接続のテスト 
-    # input_text = "とても美味しいです！"
-    # response = comprehend.detect_sentiment(
-    #     Text='input_text',
-    #     LanguageCode='ja'
-    # )    
-    # sentiment_score = response.get('SentimentScore')
-    # return {
-    #     'statusCode': 200,
-    #     'body': json.dumps({
-    #         'sentiment_score': sentiment_score
-    #     })
-    # }
+def request_analysis(input_filename):
+    
+    comprehend = boto3.client('comprehend')
+    
+    job_name = "MachineIntelligence-" + input_filename
+    input_s3URI = "s3://" + BUCKET_NAME + "/" + input_filename
+    output_s3URI = input_s3URI[:-10]
+    
+    comprehend.start_sentiment_detection_job(
+        DataAccessRoleArn=COMPREHEND_ACCESS_ARN,
+        InputDataConfig={
+            'S3Uri': input_s3URI,
+            'InputFormat': 'ONE_DOC_PER_LINE',
+        },
+        OutputDataConfig={
+            'S3Uri': output_s3URI,
+        },
+        JobName=job_name,
+        LanguageCode='ja'
+    )
 
-# if __name__ == "__main__":
-#     res = lambda_handler(None, None)
-#     print(res)
+
+def lambda_handler(event, context):
+
+    ### get request body
+    BOT_TOKEN = event["bot_token"]
+    CHANNEL_NAME = event["channel_name"]
+
+    input_filename_list = get_slack_history(BOT_TOKEN, CHANNEL_NAME)
+    for input_filename in input_filename_list:
+        request_analysis(input_filename)
+    
+    
+    return input_filename_list
